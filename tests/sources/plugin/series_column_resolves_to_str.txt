@@ -1,0 +1,11 @@
+import pandera.polars as pa
+from pandera.typing.polars import Series
+
+class MySchema(pa.DataFrameModel):
+    price: Series[float]
+    quantity: Series[int]
+    label: Series[str]
+
+price: str = MySchema.price
+quantity: str = MySchema.quantity
+label: str = MySchema.label

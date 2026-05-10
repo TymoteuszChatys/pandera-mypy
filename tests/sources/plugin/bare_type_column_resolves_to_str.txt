@@ -1,0 +1,8 @@
+import pandera.polars as pa
+
+class MySchema(pa.DataFrameModel):
+    quantity: int
+    label: str
+
+quantity_name: str = MySchema.quantity
+label_name: str = MySchema.label

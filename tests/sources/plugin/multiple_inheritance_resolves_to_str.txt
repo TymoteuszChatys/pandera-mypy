@@ -1,0 +1,14 @@
+import pandera.polars as pa
+from pandera.typing.polars import Series
+
+class SchemaA(pa.DataFrameModel):
+    price: Series[float]
+
+class SchemaB(pa.DataFrameModel):
+    quantity: Series[int]
+
+class Combined(SchemaA, SchemaB):
+    pass
+
+price_name: str = Combined.price
+quantity_name: str = Combined.quantity
