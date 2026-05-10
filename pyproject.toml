@@ -1,0 +1,88 @@
+[project]
+name = "pandera-mypy"
+version = "0.0.1"
+description = "Mypy plugin that resolves Pandera DataFrameModel column attributes as str"
+authors = [{name = "Tymoteusz Chatys", email = "tymoteuszchatys@gmail.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+keywords = [
+    "mypy",
+    "pandera",
+    "polars",
+    "plugin",
+    "type-checking",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
+dependencies = ["mypy>=1.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/TymoteuszChatys/pandera-mypy"
+Repository = "https://github.com/TymoteuszChatys/pandera-mypy"
+Issues = "https://github.com/TymoteuszChatys/pandera-mypy/issues"
+
+[dependency-groups]
+dev = [
+    "ruff~=0.14.0",
+    "pytest>=8.2.0",
+    "pytest-cov>=5.0.0",
+    "pytest-sugar>=1.0.0",
+    "pandera[polars]>=0.21.0",
+    "polars>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pandera_mypy"]
+
+[tool.ruff]
+exclude = [
+    ".git",
+    ".venv",
+    ".pycache",
+    "build",
+    "dist",
+]
+line-length = 80
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",  # conflicts with ruff formatter (trailing comma)
+    "D203",    # incompatible with D211 (no-blank-line-before-class)
+    "D213",    # incompatible with D212 (multi-line-summary-first-line)
+]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101",  # assert is idiomatic in pytest
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-branch --cov-fail-under=100"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

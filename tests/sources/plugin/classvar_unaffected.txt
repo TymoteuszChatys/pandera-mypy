@@ -1,0 +1,9 @@
+from typing import ClassVar
+import pandera.polars as pa
+from pandera.typing.polars import Series
+
+class MySchema(pa.DataFrameModel):
+    price: Series[float]
+    META: ClassVar[str] = "schema"
+
+result: str = MySchema.META

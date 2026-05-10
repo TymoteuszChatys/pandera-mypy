@@ -1,0 +1,151 @@
+name: Publish to PyPI
+
+# Triggers on pushes to main that modify pyproject.toml, plus manual dispatch.
+# The workflow publishes only when project.version actually changed compared
+# with the previous state of main.
+#
+# Setup (one-time, before first publish):
+#   1. Create the GitHub Actions environment named "pypi" in this repo.
+#   2. On PyPI, add a pending Trusted Publisher for project "pandera-mypy":
+#      https://pypi.org/manage/account/publishing/
+#   3. Configure it with:
+#      - Owner:       TymoteuszChatys
+#      - Repo:        pandera-mypy
+#      - Workflow:    publish.yml
+#      - Environment: pypi
+#      - Project name: pandera-mypy
+#   4. Ensure the pypi environment has no required reviewers; otherwise
+#      publishing will pause for manual approval.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and publish to PyPI
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC Trusted Publishing
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Detect version bump
+        id: version_check
+        run: |
+          CURRENT_VERSION=$(python - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])
+          PY
+          )
+
+          PREVIOUS_VERSION=$(python - <<'PY'
+          import os
+          import subprocess
+          import tomllib
+
+          before = os.environ.get("GITHUB_EVENT_BEFORE", "")
+          if not before or set(before) == {"0"}:
+              print("")
+          else:
+              result = subprocess.run(
+                  ["git", "show", f"{before}:pyproject.toml"],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+              )
+              if result.returncode != 0:
+                  print("")
+              else:
+                  print(tomllib.loads(result.stdout)["project"]["version"])
+          PY
+          )
+
+          {
+            echo "current_version=$CURRENT_VERSION"
+            echo "previous_version=$PREVIOUS_VERSION"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -z "$PREVIOUS_VERSION" ]; then
+            echo "Previous version unavailable; publishing $CURRENT_VERSION."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
+            echo "Version unchanged ($CURRENT_VERSION); skipping publish."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Version changed: $PREVIOUS_VERSION -> $CURRENT_VERSION"
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether version already exists on PyPI
+        id: pypi_check
+        if: steps.version_check.outputs.should_publish == 'true'
+        env:
+          PACKAGE_VERSION: ${{ steps.version_check.outputs.current_version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          version = os.environ["PACKAGE_VERSION"]
+          url = "https://pypi.org/pypi/pandera-mypy/json"
+
+          try:
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  releases = json.load(response)["releases"]
+          except urllib.error.HTTPError as error:
+              if error.code == 404:
+                  releases = {}
+              else:
+                  raise
+
+          already_published = version in releases and bool(releases[version])
+          if already_published:
+              print(f"Version {version} already exists on PyPI.")
+          else:
+              print(f"Version {version} is not on PyPI yet.")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(
+                  "already_published="
+                  f"{str(already_published).lower()}\n"
+              )
+          PY
+
+      - name: Build wheel and sdist
+        if: |
+          steps.version_check.outputs.should_publish == 'true' &&
+          steps.pypi_check.outputs.already_published != 'true'
+        run: uv build
+
+      - name: Publish to PyPI
+        if: |
+          steps.version_check.outputs.should_publish == 'true' &&
+          steps.pypi_check.outputs.already_published != 'true'
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1 (v1.14.0)

@@ -1,0 +1,11 @@
+import pandera.polars as pa
+from pandera.typing.polars import Series
+
+class MySchema(pa.DataFrameModel):
+    price: Series[float]
+
+    @classmethod
+    def alias(cls) -> str:
+        return "my_schema"
+
+result: str = MySchema.alias()
